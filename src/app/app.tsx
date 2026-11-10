@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { DAppKitProvider } from "@mysten/dapp-kit-react";
-import { ConnectButton } from "@mysten/dapp-kit-react/ui";
 import { dAppKit } from "./dapp-kit";
 import Recurring from "./recurring";
 import Send from "./send";
+import { WalletButton } from "./wallet";
 
 const TABS = [
   { id: "watch", label: "Watchdog", icon: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5M12 7v5l3 2" },
@@ -18,14 +18,23 @@ export default function App() {
   const go = (t: TabId) => (setTab(t), history.replaceState(null, "", `#${t}`), window.scrollTo({ top: 0 }));
   return (
     <DAppKitProvider dAppKit={dAppKit}>
-      <div className="mx-auto w-full max-w-md px-4 pb-32 pt-4 sm:pt-8">
-        <header className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between bg-[#0b0e17]/80 px-4 py-3 backdrop-blur-lg">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static svg logo */}
-            <img src="/logo.svg" alt="" className="h-8 w-8" />
-            <span className="text-lg font-bold tracking-tight">Drip Radar</span>
+      <div className="mx-auto w-full max-w-md px-4 pb-32 pt-1 sm:pt-6">
+        <header className="sticky top-3 z-30 mb-6 flex items-center justify-between gap-2 rounded-full border border-white/10 bg-[#111522]/85 py-1.5 pl-2 pr-1.5 shadow-[0_8px_30px_-12px_rgba(0,0,0,.7)] backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sky-400/25 to-violet-400/25">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static svg logo */}
+              <img src="/logo.svg" alt="" className="h-6 w-6" />
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[15px] font-extrabold tracking-tight">Drip Radar</span>
+              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> agent on watch
+              </span>
+            </span>
           </div>
-          <ConnectButton />
+          <div className="shrink-0">
+            <WalletButton />
+          </div>
         </header>
 
         {tab === "watch" ? <Recurring /> : <Send initialTo="" />}

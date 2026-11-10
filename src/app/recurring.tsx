@@ -103,7 +103,7 @@ export default function Recurring() {
         <div className="mt-8 space-y-3">
           <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Paste a Sui wallet address" spellCheck={false} className="input font-mono text-sm" />
           {addr && !valid && <p className="px-1 text-sm text-amber-300">That doesn&apos;t look like a full Sui address.</p>}
-          {!account && <p className="px-1 text-center text-sm text-zinc-500">or tap Connect at the top to use your own wallet</p>}
+          {!account && <p className="px-1 text-center text-sm text-zinc-500">or connect your wallet at the top</p>}
         </div>
         <ul className="mt-10 space-y-4">
           {[

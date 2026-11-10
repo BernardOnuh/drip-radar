@@ -28,3 +28,30 @@ body {
 select.input option { background: #111; }
 
 html { -webkit-tap-highlight-color: transparent; background: #0b0e17; }
+
+@keyframes sheet { from { transform: translateY(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+/* Wallet button + connect modal, themed to match */
+:root {
+  --dapp-kit-font-sans: var(--font-ui), system-ui, sans-serif;
+  --dapp-kit-primary: #38bdf8;
+  --dapp-kit-primary-foreground: #06121f;
+  --dapp-kit-accent: rgba(56, 189, 248, 0.12);
+  --dapp-kit-accent-foreground: #e0f2fe;
+  --dapp-kit-secondary: rgba(255, 255, 255, 0.06);
+  --dapp-kit-secondary-foreground: #eef2f7;
+  --dapp-kit-background: #111522;
+  --dapp-kit-foreground: #eef2f7;
+  --dapp-kit-popover: #111522;
+  --dapp-kit-popover-foreground: #eef2f7;
+  --dapp-kit-muted: rgba(255, 255, 255, 0.05);
+  --dapp-kit-muted-foreground: #94a3b8;
+  --dapp-kit-border: rgba(255, 255, 255, 0.1);
+  --dapp-kit-input: rgba(255, 255, 255, 0.1);
+  --dapp-kit-ring: #38bdf8;
+  --dapp-kit-radius: 18px;
+  --dapp-kit-radius-lg: 24px;
+  --dapp-kit-radius-xl: 28px;
+  --dapp-kit-font-weight-medium: 600;
+  --dapp-kit-font-weight-semibold: 700;
+}

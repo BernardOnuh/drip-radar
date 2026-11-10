@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentAccount, useCurrentClient, useDAppKit } from "@mysten/dapp-kit-react";
-import { ConnectButton } from "@mysten/dapp-kit-react/ui";
+import { WalletButton } from "./wallet";
 import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import {
-  GuardPanel, SUI_TYPE, SimulationPanel, fromRaw, short, suiscanTx, toRaw, useTokens, walruscan,
+  LEVEL, SUI_TYPE, SimulationPanel, fromRaw, short, suiscanTx, toRaw, useTokens, walruscan,
   type BalanceChange,
 } from "./shared";
 import { TokenPicker, TokenPill, useTokenList, usd, type PickedToken } from "./tokens";
@@ -168,135 +168,150 @@ export default function Send({ initialTo = "" }: { initialTo?: string }) {
 
   const blocked = review?.check.level === "critical" && !override;
 
+  const lv = review ? LEVEL[review.check.level] : null;
   return (
-    <div className="mx-auto w-full max-w-[480px] space-y-3">
-      <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-2 shadow-[0_0_60px_-20px_rgba(16,185,129,0.35)]">
-        <div className="px-3 pb-2 pt-1 font-medium">Send</div>
-
-        {/* Amount */}
-        <div className="rounded-2xl border border-white/5 bg-black/30 p-4">
-          <div className="mb-1 flex justify-between text-xs text-zinc-400">
-            <span>Amount</span>
-            {wTok && token && (
-              <span>
-                Balance {fromRaw(wTok.balance, wTok.decimals)}
-                <button
-                  onClick={() => {
-                    const keep = token.type === SUI_TYPE ? BigInt(20_000_000) : BigInt(0);
-                    const v = wTok.balance > keep ? wTok.balance - keep : BigInt(0);
-                    setAmount(fromRaw(v, wTok.decimals, wTok.decimals).replace(/,/g, ""));
-                  }}
-                  className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-300 hover:bg-emerald-500/25"
-                >
-                  MAX
-                </button>
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              value={amount}
-              onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && (setAmount(e.target.value), setReview(null))}
-              inputMode="decimal"
-              placeholder="0"
-              className="min-w-0 flex-1 bg-transparent font-mono text-3xl outline-none placeholder:text-zinc-600"
-            />
-            <TokenPill token={token} onClick={() => setPicker(true)} />
-          </div>
-          <div className="mt-1 h-4 text-xs text-zinc-500">{usd(amtUsd)}</div>
-        </div>
-
-        {/* Recipient */}
-        <div className="mt-2">
-          <RecipientField value={to} onChange={setTo} state={recip} />
-        </div>
-
-        <div className="p-1 pt-3">
-          {!account ? (
-            <div className="flex justify-center [&_button]:w-full">
-              <ConnectButton />
-            </div>
-          ) : (
-            <button onClick={doReview} disabled={!!busy || !raw || !validAddr || insufficient} className="btn-primary w-full py-3.5 text-base">
-              {busy === "review"
-                ? "Checking recipient · simulating…"
-                : !raw
-                  ? "Enter an amount"
-                  : insufficient
-                    ? `Not enough ${token?.symbol}`
-                    : !validAddr
-                      ? "Enter a recipient"
-                      : "Review send"}
-            </button>
-          )}
-        </div>
+    <div className="space-y-4">
+      <div className="px-1">
+        <h1 className="text-[26px] font-extrabold tracking-tight">Send</h1>
+        <p className="text-sm text-zinc-400">I check every payment against your rules before you sign.</p>
       </div>
 
-      {error && <p className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">{error}</p>}
-
-      {review && account && (
-        <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium">Review</h3>
-            <button onClick={() => setReview(null)} className="text-xs text-zinc-400 hover:text-white">
-              Cancel
+      {/* Amount */}
+      <div className="card px-5 pb-5 pt-6 text-center">
+        <input
+          value={amount}
+          onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && (setAmount(e.target.value), setReview(null))}
+          inputMode="decimal"
+          placeholder="0"
+          className="w-full bg-transparent text-center font-mono text-5xl font-semibold tracking-tight outline-none placeholder:text-zinc-700"
+        />
+        <div className="mt-1 h-5 text-sm text-zinc-500">{usd(amtUsd)}</div>
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <TokenPill token={token} onClick={() => setPicker(true)} />
+          {wTok && token && (
+            <button
+              onClick={() => {
+                const keep = token.type === SUI_TYPE ? BigInt(20_000_000) : BigInt(0);
+                const v = wTok.balance > keep ? wTok.balance - keep : BigInt(0);
+                setAmount(fromRaw(v, wTok.decimals, wTok.decimals).replace(/,/g, ""));
+              }}
+              className="rounded-full bg-sky-400/15 px-3 py-2 text-xs font-bold text-sky-300 active:scale-95"
+            >
+              MAX
             </button>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-black/30 p-3">
-            <AddressAvatar address={review.to} size={40} />
-            <div className="min-w-0">
-              <div className="font-mono text-sm">
-                {fromRaw(review.amountRaw, review.token.decimals, 9)} {review.token.symbol}
-              </div>
-              <div className="truncate font-mono text-xs text-zinc-500">to {review.to}</div>
-            </div>
-          </div>
-          <GuardPanel level={review.check.level} signals={review.check.signals} title="Recipient check" />
-          <div className="border-t border-white/10 pt-4">
-            <SimulationPanel changes={review.changes} me={account.address} tokens={tokens} gasMocked={review.gasMocked} />
-            {review.simError && <p className="mt-2 text-sm text-rose-300">Simulation: {review.simError}</p>}
-          </div>
-          {review.check.level === "critical" && (
-            <label className="flex items-start gap-2 text-sm text-rose-200">
-              <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} className="mt-1" />
-              I understand the risk and want to send anyway.
-            </label>
           )}
-          <button
-            onClick={doSend}
-            disabled={!!busy || blocked || !!review.simError}
-            className={`${review.check.level === "critical" ? "btn-danger" : "btn-primary"} w-full py-3.5 text-base`}
-          >
-            {busy === "send" ? "Confirm in your wallet…" : `Send ${fromRaw(review.amountRaw, review.token.decimals, 9)} ${review.token.symbol}`}
-          </button>
         </div>
-      )}
+        {wTok && <p className="mt-3 text-xs text-zinc-500">Balance {fromRaw(wTok.balance, wTok.decimals)} {wTok.symbol}</p>}
+      </div>
 
-      {done && (
-        <div className="space-y-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
-          <p className="font-medium text-emerald-300">Sent ✓ {done.text}</p>
-          <a className="text-xs text-emerald-200/80 underline" href={suiscanTx(done.digest)} target="_blank">
-            View on Suiscan ↗
-          </a>
-          <p className="text-xs text-zinc-400">
-            {done.memoryBlob ? (
-              <>
-                Remembered in Walrus{" "}
-                <a className="underline" href={walruscan(done.memoryBlob)} target="_blank">
-                  ↗
-                </a>
-              </>
+      {/* Recipient */}
+      <RecipientField value={to} onChange={setTo} state={recip} label="Send to" />
+
+      {error && <p className="rounded-2xl bg-rose-500/10 p-3 text-sm text-rose-200 ring-1 ring-rose-500/30">{error}</p>}
+
+      <div className="sticky bottom-24 z-20 pt-1">
+        {!account ? (
+          <WalletButton full />
+        ) : (
+          <button onClick={doReview} disabled={!!busy || !raw || !validAddr || insufficient} className="btn-primary w-full text-base shadow-[0_10px_40px_-10px_rgba(56,189,248,.6)]">
+            {busy === "review" ? "Checking & simulating…" : !raw ? "Enter an amount" : insufficient ? `Not enough ${token?.symbol}` : !validAddr ? "Add a recipient" : "Review payment"}
+          </button>
+        )}
+      </div>
+
+      {/* Review: bottom sheet */}
+      {(review || done) && account && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={() => !busy && (setReview(null), setDone(null))}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[32px] border border-white/10 bg-[#111522] p-5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-2xl sm:rounded-[32px]"
+            style={{ animation: "sheet .28s cubic-bezier(.2,.9,.3,1)" }}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-white/15" />
+            {done ? (
+              <div className="text-center">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-3xl text-emerald-300">✓</div>
+                <h3 className="mt-4 text-xl font-bold">Payment sent</h3>
+                <p className="mt-1 text-zinc-400">{done.text}</p>
+                <div className="mt-5 space-y-2 text-sm">
+                  <a className="block rounded-2xl bg-white/[0.05] py-3 font-semibold" href={suiscanTx(done.digest)} target="_blank">
+                    View transaction ↗
+                  </a>
+                  {!done.trusted ? (
+                    <button onClick={trustRecipient} disabled={!!busy} className="w-full rounded-2xl bg-emerald-500/15 py-3 font-semibold text-emerald-200">
+                      {busy === "trust" ? "Saving…" : "Remember this person as trusted"}
+                    </button>
+                  ) : (
+                    <p className="text-emerald-300">Saved. I&apos;ll recognise them next time.</p>
+                  )}
+                  <p className="pt-1 text-xs text-zinc-500">
+                    {done.memoryBlob ? (
+                      <a href={walruscan(done.memoryBlob)} target="_blank" className="text-violet-300">
+                        Remembered on Walrus ↗
+                      </a>
+                    ) : (
+                      "Saving to Walrus Memory…"
+                    )}
+                  </p>
+                  <button onClick={() => setDone(null)} className="w-full py-2 text-zinc-400">
+                    Done
+                  </button>
+                </div>
+              </div>
             ) : (
-              "Saving this send to Walrus Memory…"
+              review &&
+              lv && (
+                <>
+                  <div className="text-center">
+                    <p className="text-sm text-zinc-400">You&apos;re sending</p>
+                    <p className="mt-1 font-mono text-4xl font-semibold">
+                      {fromRaw(review.amountRaw, review.token.decimals, 6)} <span className="text-2xl text-zinc-400">{review.token.symbol}</span>
+                    </p>
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/[0.05] py-1.5 pl-1.5 pr-4">
+                      <AddressAvatar address={review.to} size={28} />
+                      <span className="font-mono text-sm">{short(review.to)}</span>
+                    </div>
+                  </div>
+
+                  <div className={`mt-5 rounded-2xl p-4 ring-1 ${lv.cls}`}>
+                    <p className="font-bold">{lv.label}</p>
+                    <ul className="mt-2 space-y-1.5 text-sm text-zinc-200">
+                      {review.check.signals.slice(0, 4).map((x, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="opacity-60">•</span>
+                          <span>{x.text}</span>
+                        </li>
+                      ))}
+                      {review.check.signals.length === 0 && <li>No warnings found.</li>}
+                    </ul>
+                  </div>
+
+                  <details className="mt-3 rounded-2xl bg-white/[0.04] p-4 text-sm">
+                    <summary className="cursor-pointer font-semibold">What will happen (simulated by Tatum)</summary>
+                    <div className="mt-3">
+                      <SimulationPanel changes={review.changes} me={account.address} tokens={tokens} gasMocked={review.gasMocked} />
+                    </div>
+                  </details>
+                  {review.simError && <p className="mt-2 text-sm text-rose-300">Simulation failed: {review.simError}</p>}
+
+                  {review.check.level === "critical" && (
+                    <label className="mt-4 flex items-start gap-3 rounded-2xl bg-rose-500/10 p-3 text-sm text-rose-200">
+                      <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} className="mt-0.5 h-5 w-5 accent-rose-500" />
+                      I understand the risk and still want to send.
+                    </label>
+                  )}
+                  <div className="mt-5 grid grid-cols-[1fr_2fr] gap-2">
+                    <button onClick={() => setReview(null)} disabled={!!busy} className="rounded-2xl bg-white/[0.06] py-3.5 font-semibold">
+                      Cancel
+                    </button>
+                    <button onClick={doSend} disabled={!!busy || blocked || !!review.simError} className={`${review.check.level === "critical" ? "btn-danger" : "btn-primary"} text-base`}>
+                      {busy === "send" ? "Confirm in wallet…" : "Send now"}
+                    </button>
+                  </div>
+                </>
+              )
             )}
-          </p>
-          {!done.trusted ? (
-            <button onClick={trustRecipient} disabled={!!busy} className="rounded-full border border-emerald-500/40 px-3 py-1.5 text-emerald-300 hover:bg-emerald-500/10">
-              {busy === "trust" ? "Saving…" : "✓ Trust this recipient for next time"}
-            </button>
-          ) : (
-            <p className="text-emerald-300">Recipient trusted. Lookalikes of this address will now be flagged.</p>
-          )}
+          </div>
         </div>
       )}
 

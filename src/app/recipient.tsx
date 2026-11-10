@@ -108,8 +108,8 @@ export function RecipientField({
   const { address, valid, check, loading } = state;
   const name = checkName(check);
   return (
-    <div className="rounded-2xl border border-white/5 bg-black/30 p-4">
-      <div className="mb-2 text-xs text-zinc-400">{label}</div>
+    <div className="card p-4">
+      <div className="mb-2 text-sm font-semibold text-zinc-300">{label}</div>
       <div className="flex items-center gap-3">
         {valid ? <AddressAvatar address={address} /> : <span className="h-9 w-9 shrink-0 rounded-full border border-dashed border-white/15" />}
         <input
