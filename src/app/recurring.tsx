@@ -126,6 +126,22 @@ export default function Recurring() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-end justify-between gap-3 px-1">
+        <div>
+          <h1 className="text-[26px] font-extrabold tracking-tight">Watchdog</h1>
+          <p className="text-sm text-zinc-400">Your spending, remembered.</p>
+        </div>
+        <button
+          onClick={() => setN((x) => x + 1)}
+          disabled={loading}
+          className="flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3.5 py-2 text-sm font-semibold active:scale-95 disabled:opacity-50"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className={loading ? "animate-spin" : ""}>
+            <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
+          </svg>
+          {loading ? "Checking" : "Check again"}
+        </button>
+      </div>
       <button onClick={() => setEditing(true)} className="card flex w-full items-center gap-3 px-4 py-3 text-left">
         <AddressAvatar address={address} size={36} />
         <span className="min-w-0 flex-1">
@@ -166,6 +182,7 @@ export default function Recurring() {
               </div>
             )}
           </section>
+          <Memory scan={scan} />
           {scan.memoryError && <p className="text-xs text-amber-300">Memory unavailable: {scan.memoryError}</p>}
         </>
       )}
@@ -179,12 +196,18 @@ function Report({ scan }: { scan: Scan }) {
   return (
     <section className="card overflow-hidden">
       <div className="p-5">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sky-300">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+        <div className="flex items-center gap-3">
+          <span className="relative grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-sky-400/30 to-violet-400/30 text-lg">
+            🐕
+            <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-[#151a28] bg-emerald-400" />
+            </span>
           </span>
-          Watchdog
+          <span className="leading-tight">
+            <span className="block text-sm font-bold">Your watchdog</span>
+            <span className="block text-xs text-zinc-500">{last ? `remembers you · ${ago(Date.parse(last.at))}` : "meeting this wallet"}</span>
+          </span>
         </div>
         <p className="mt-3 text-[19px] font-semibold leading-snug">
           {last ? (
@@ -196,6 +219,18 @@ function Report({ scan }: { scan: Scan }) {
             <>First look at this wallet. I&apos;ll remember it, so next time I can tell you what changed.</>
           )}
         </p>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {[
+            [scan.scanned, "txs read"],
+            [scan.recurring.length, "repeating"],
+            [r.alerts.filter((a) => a.level !== "info").length, "alerts"],
+          ].map(([v, l]) => (
+            <div key={l} className="rounded-2xl bg-white/[0.04] px-2 py-3 text-center">
+              <div className={`font-mono text-2xl font-semibold ${l === "alerts" && Number(v) > 0 ? "text-rose-300" : ""}`}>{v}</div>
+              <div className="mt-0.5 text-[11px] font-medium text-zinc-500">{l}</div>
+            </div>
+          ))}
+        </div>
         {r.spend.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {r.spend.map((x) => (
@@ -330,5 +365,33 @@ function Row({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void }) 
         </div>
       )}
     </div>
+  );
+}
+
+function Memory({ scan }: { scan: Scan }) {
+  if (!scan.rules.length) return null;
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline justify-between px-1">
+        <h2 className="text-lg font-bold">What I remember</h2>
+        <span className="text-xs font-semibold text-violet-300">on Walrus</span>
+      </div>
+      <div className="card divide-y divide-white/[0.06]">
+        {scan.rules.slice(0, 6).map((r) => (
+          <div key={r.blobId} className="flex items-center gap-3 px-4 py-3">
+            <AddressAvatar address={r.to} size={32} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{scan.labels[r.to]?.label ?? short(r.to)}</span>
+              <span className="block text-xs text-zinc-500">
+                {r.action === "cap" ? `Max ${r.cap} ${r.symbol} per payment` : r.action === "cancel" ? `Stop all ${r.symbol} payments` : `${r.symbol} payments are OK`} · {r.at.slice(0, 10)}
+              </span>
+            </span>
+            <a href={walruscan(r.blobId)} target="_blank" rel="noreferrer" className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${RULE[r.action].cls}`}>
+              {RULE[r.action].text}
+            </a>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
