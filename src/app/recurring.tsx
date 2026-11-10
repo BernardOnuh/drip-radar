@@ -39,78 +39,32 @@ type Scan = {
   };
 };
 
-const ALERT = { critical: "border-rose-500/40 bg-rose-500/10 text-rose-200", high: "border-amber-500/40 bg-amber-500/10 text-amber-200", info: "border-sky-500/30 bg-sky-500/10 text-sky-200" };
-
-function Report({ scan }: { scan: Scan }) {
-  const r = scan.report;
-  const last = r.lastScan;
-  return (
-    <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] to-transparent p-4 sm:p-5">
-      <div className="flex items-center gap-2">
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" />
-        </span>
-        <p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Watchdog report</p>
-      </div>
-      <p className="mt-2 text-lg font-medium">
-        {last ? (
-          <>
-            Welcome back. I last checked this wallet {ago(Date.parse(last.at))}
-            {r.freshCount ? `, and ${r.freshCount} new transfer${r.freshCount === 1 ? "" : "s"} went out since then.` : ". Nothing new has gone out since then."}
-          </>
-        ) : (
-          <>First check of this wallet. I&apos;ll remember what I saw, so next time I can tell you what changed.</>
-        )}
-      </p>
-      {r.spend.length > 0 && (
-        <p className="mt-1 text-sm text-zinc-400">
-          Spent since last check: <span className="text-zinc-200">{r.spend.map((x) => `${x.amount} ${x.symbol}`).join(" · ")}</span>
-          {r.newRecipients.length > 0 && <> · new recipients: <span className="text-zinc-200">{r.newRecipients.join(", ")}</span></>}
-        </p>
-      )}
-      <div className="mt-3 space-y-2">
-        {r.alerts.map((a, i) => (
-          <div key={i} className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${ALERT[a.level]}`}>
-            <span>{a.level === "info" ? "ℹ" : "⚠"}</span>
-            <span className="flex-1">{a.text}</span>
-            {a.atMs && <span className="shrink-0 text-xs opacity-70">{ago(a.atMs)}</span>}
-          </div>
-        ))}
-        {r.alerts.length === 0 && <p className="text-sm text-emerald-300">✓ No rule was broken. Every payment respected your keep / cancel / cap rules.</p>}
-      </div>
-      <p className="mt-3 text-xs text-zinc-500">
-        Memory: {scan.rules.length} rule{scan.rules.length === 1 ? "" : "s"} recalled from <span className="text-violet-300">Walrus</span>
-        {last && (
-          <>
-            {" "}· last check{" "}
-            <a href={walruscan(last.blobId)} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
-              stored on Walrus
-            </a>
-          </>
-        )}{" "}
-        · this check is being saved now.
-      </p>
-    </div>
-  );
-}
-
 const ago = (ms: number) => {
   const d = (Date.now() - ms) / 86_400_000;
   if (d < 1 / 24) return `${Math.max(1, Math.round(d * 1440))} min ago`;
   return d < 1 ? `${Math.round(d * 24)}h ago` : `${Math.round(d)}d ago`;
 };
-const every = (d: number | null) => (d == null ? "" : d < 1 ? `every ~${Math.max(1, Math.round(d * 24))}h` : `every ~${Math.round(d)} day${Math.round(d) === 1 ? "" : "s"}`);
+const inTime = (ms: number) => {
+  const d = (ms - Date.now()) / 86_400_000;
+  return d < 1 ? `in ${Math.max(1, Math.round(d * 24))}h` : `in ${Math.round(d)} days`;
+};
+const freq = (d: number | null) => (d == null ? "" : d < 1 ? `every ${Math.max(1, Math.round(d * 24))}h` : `every ${Math.round(d)} day${Math.round(d) === 1 ? "" : "s"}`);
 
-const RULE_STYLE = {
-  keep: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/40",
-  cancel: "bg-rose-500/15 text-rose-300 ring-rose-500/50",
-  cap: "bg-amber-500/15 text-amber-300 ring-amber-500/40",
+const ALERT = {
+  critical: "bg-rose-500/12 text-rose-100 ring-rose-500/30",
+  high: "bg-amber-500/12 text-amber-100 ring-amber-500/30",
+  info: "bg-sky-500/12 text-sky-100 ring-sky-500/30",
+};
+const RULE = {
+  keep: { text: "Kept", cls: "bg-emerald-500/15 text-emerald-300" },
+  cancel: { text: "Stopped", cls: "bg-rose-500/15 text-rose-300" },
+  cap: { text: "Limited", cls: "bg-amber-500/15 text-amber-300" },
 } as const;
 
 export default function Recurring() {
   const account = useCurrentAccount();
   const [addr, setAddr] = useState(account?.address ?? "");
+  const [editing, setEditing] = useState(false);
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +83,7 @@ export default function Recurring() {
     setLoading(true);
     fetch("/api/recurring", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address }) })
       .then((r) => r.json())
-      .then((r) => !cancelled && (r.error ? setError(r.error) : setScan(r)))
+      .then((r) => !cancelled && (r.error ? setError(r.error) : (setScan(r), setEditing(false))))
       .catch((e) => !cancelled && setError((e as Error).message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -137,62 +91,152 @@ export default function Recurring() {
     };
   }, [address, valid, n]);
 
-  return (
-    <div className="space-y-4">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-        <h2 className="text-lg font-semibold">Which wallet should I watch?</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          I read your outgoing payments on Sui via{" "}
-          <span className="text-zinc-200">Tatum</span>, spot recurring expenses, and remember every check and every rule you give me in{" "}
-          <span className="text-violet-300">Walrus Memory</span>, so I pick up where we left off on any device.
+  // ---------- Empty state: pick a wallet ----------
+  if (!valid || editing) {
+    return (
+      <div className="pt-6">
+        <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-3xl bg-sky-400/10 text-3xl">💧</div>
+        <h1 className="text-center text-[28px] font-extrabold leading-tight tracking-tight">Where is your money going?</h1>
+        <p className="mx-auto mt-3 max-w-xs text-center text-[15px] leading-relaxed text-zinc-400">
+          I watch your wallet for payments that keep repeating, and I remember what you tell me.
         </p>
-        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/5 bg-black/30 p-3">
-          {valid ? <AddressAvatar address={address} /> : <span className="h-9 w-9 shrink-0 rounded-full border border-dashed border-white/15" />}
-          <input
-            value={addr}
-            onChange={(e) => setAddr(e.target.value)}
-            placeholder="Your Sui address (or connect a wallet)"
-            spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent font-mono text-base outline-none placeholder:text-zinc-600 sm:text-sm"
-          />
-          {account && address !== account.address.toLowerCase() && (
-            <button onClick={() => setAddr(account.address)} className="shrink-0 text-xs text-emerald-300">
-              My wallet
-            </button>
-          )}
+        <div className="mt-8 space-y-3">
+          <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Paste a Sui wallet address" spellCheck={false} className="input font-mono text-sm" />
+          {addr && !valid && <p className="px-1 text-sm text-amber-300">That doesn&apos;t look like a full Sui address.</p>}
+          {!account && <p className="px-1 text-center text-sm text-zinc-500">or tap Connect at the top to use your own wallet</p>}
         </div>
-        {addr && !valid && <p className="mt-2 text-xs text-amber-300">A Sui address is 0x followed by 64 hex characters.</p>}
+        <ul className="mt-10 space-y-4">
+          {[
+            ["🔍", "I find repeating payments", "Subscriptions, payouts, people you pay often."],
+            ["✋", "You decide", "Keep it, limit it, or stop it."],
+            ["🧠", "I remember", "Next time I tell you what changed, on any device."],
+          ].map(([i, t, d]) => (
+            <li key={t} className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/[0.05] text-lg">{i}</span>
+              <span>
+                <span className="block font-semibold">{t}</span>
+                <span className="block text-sm text-zinc-400">{d}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
+    );
+  }
 
-      {loading && <div className="animate-pulse rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-zinc-400">Reading sent transactions via Tatum…</div>}
-      {error && <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div>}
+  return (
+    <div className="space-y-5">
+      <button onClick={() => setEditing(true)} className="card flex w-full items-center gap-3 px-4 py-3 text-left">
+        <AddressAvatar address={address} size={36} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs text-zinc-500">Watching</span>
+          <span className="block truncate font-mono text-sm">{short(address)}</span>
+        </span>
+        <span className="text-sm font-semibold text-sky-300">Change</span>
+      </button>
+
+      {loading && (
+        <div className="card animate-pulse p-5">
+          <div className="h-4 w-2/3 rounded bg-white/10" />
+          <div className="mt-3 h-4 w-1/2 rounded bg-white/10" />
+          <p className="mt-4 text-sm text-zinc-500">Reading your payments…</p>
+        </div>
+      )}
+      {error && <div className="rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-200 ring-1 ring-rose-500/30">{error}</div>}
 
       {scan && !loading && (
         <>
           <Report scan={scan} />
-          <p className="px-1 text-xs uppercase tracking-wider text-zinc-500">
-            Scanned your last {scan.scanned} signed transactions ({scan.sentCount} transfers) · {scan.recurring.length} recurring payment{scan.recurring.length === 1 ? "" : "s"}
-          </p>
-          {scan.recurring.length === 0 && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 text-sm text-zinc-400">
-              No repeating payments found. Nothing is quietly draining this wallet.
+          <section>
+            <div className="mb-2 flex items-baseline justify-between px-1">
+              <h2 className="text-lg font-bold">Repeating payments</h2>
+              <span className="text-sm text-zinc-500">{scan.recurring.length}</span>
             </div>
-          )}
-          {scan.recurring.map((r) => (
-            <RecCard key={`${r.to}|${r.coinType}`} r={r} scan={scan} onSaved={() => (setN((x) => x + 1), window.dispatchEvent(new Event("memory-updated")))} />
-          ))}
-          {scan.memoryError && <p className="text-xs text-amber-300">Walrus Memory unavailable: {scan.memoryError}</p>}
+            {scan.recurring.length === 0 ? (
+              <div className="card p-5 text-center">
+                <p className="text-2xl">✨</p>
+                <p className="mt-2 font-semibold">Nothing repeating</p>
+                <p className="mt-1 text-sm text-zinc-400">I checked your last {scan.scanned} transactions. No money is quietly dripping out.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {scan.recurring.map((r) => (
+                  <Row key={`${r.to}|${r.coinType}`} r={r} scan={scan} onSaved={() => setN((x) => x + 1)} />
+                ))}
+              </div>
+            )}
+          </section>
+          {scan.memoryError && <p className="text-xs text-amber-300">Memory unavailable: {scan.memoryError}</p>}
         </>
       )}
     </div>
   );
 }
 
-function RecCard({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void }) {
+function Report({ scan }: { scan: Scan }) {
+  const r = scan.report;
+  const last = r.lastScan;
+  return (
+    <section className="card overflow-hidden">
+      <div className="p-5">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sky-300">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+          </span>
+          Watchdog
+        </div>
+        <p className="mt-3 text-[19px] font-semibold leading-snug">
+          {last ? (
+            <>
+              Welcome back! Last check was {ago(Date.parse(last.at))}.{" "}
+              {r.freshCount ? `${r.freshCount} new payment${r.freshCount === 1 ? "" : "s"} since then.` : "Nothing new went out since."}
+            </>
+          ) : (
+            <>First look at this wallet. I&apos;ll remember it, so next time I can tell you what changed.</>
+          )}
+        </p>
+        {r.spend.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {r.spend.map((x) => (
+              <span key={x.coinType} className="rounded-full bg-white/[0.06] px-3 py-1.5 font-mono text-sm">
+                −{x.amount} {x.symbol}
+              </span>
+            ))}
+          </div>
+        )}
+        {r.newRecipients.length > 0 && <p className="mt-3 text-sm text-zinc-400">New people paid: {r.newRecipients.join(", ")}</p>}
+      </div>
+      <div className="space-y-2 border-t border-white/[0.06] p-4">
+        {r.alerts.map((a, i) => (
+          <div key={i} className={`flex gap-2 rounded-2xl px-3 py-2.5 text-sm ring-1 ${ALERT[a.level]}`}>
+            <span>{a.level === "info" ? "ℹ️" : "⚠️"}</span>
+            <span className="flex-1">{a.text}</span>
+          </div>
+        ))}
+        {r.alerts.length === 0 && <p className="px-1 text-sm text-emerald-300">✓ All payments follow your rules.</p>}
+        <p className="px-1 pt-1 text-xs text-zinc-500">
+          Remembered on Walrus · {scan.rules.length} rule{scan.rules.length === 1 ? "" : "s"}
+          {last && (
+            <>
+              {" · "}
+              <a href={walruscan(last.blobId)} target="_blank" rel="noreferrer" className="text-violet-300">
+                last check
+              </a>
+            </>
+          )}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function Row({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void }) {
   const meta = scan.coinMeta[r.coinType] ?? { symbol: r.coinType.split("::").pop()!, decimals: 9, iconUrl: null };
   const rule = scan.rules.find((x) => x.to === r.to && x.coinType === r.coinType);
   const who = scan.labels[r.to];
-  const [mode, setMode] = useState<null | "cap">(null);
+  const [open, setOpen] = useState(false);
+  const [capMode, setCapMode] = useState(false);
   const [cap, setCap] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -200,7 +244,7 @@ function RecCard({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void
   async function save(action: "keep" | "cancel" | "cap") {
     setErr(null);
     const capRaw = action === "cap" ? toRaw(cap, meta.decimals) : null;
-    if (action === "cap" && !capRaw) return setErr("Enter a cap amount.");
+    if (action === "cap" && !capRaw) return setErr("Enter an amount.");
     setBusy(action);
     try {
       const res = await fetch("/api/rule", {
@@ -209,7 +253,7 @@ function RecCard({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void
         body: JSON.stringify({ to: r.to, coinType: r.coinType, symbol: meta.symbol, action, cap: action === "cap" ? cap : undefined, capRaw: capRaw?.toString(), label: who?.label ?? undefined }),
       }).then((x) => x.json());
       if (res.error) throw new Error(res.error);
-      setMode(null);
+      setOpen(false);
       onSaved();
     } catch (e) {
       setErr((e as Error).message);
@@ -219,92 +263,71 @@ function RecCard({ r, scan, onSaved }: { r: Rec; scan: Scan; onSaved: () => void
   }
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-      <div className="flex items-start gap-3">
-        <div className="relative">
-          <AddressAvatar address={r.to} size={44} />
+    <div className="card overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 p-4 text-left">
+        <span className="relative">
+          <AddressAvatar address={r.to} size={42} />
           <span className="absolute -bottom-1 -right-1">
-            <TokenLogo type={r.coinType} iconUrl={meta.iconUrl} symbol={meta.symbol} size={22} />
+            <TokenLogo type={r.coinType} iconUrl={meta.iconUrl} symbol={meta.symbol} size={20} />
           </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{who?.label ?? short(r.to)}</span>
-            {who?.verdict === "block" && <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-300 ring-1 ring-rose-500/50">blocked</span>}
-            {r.regular && <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-500/40">regular</span>}
-            {rule && (
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${RULE_STYLE[rule.action]}`}>
-                {rule.action === "cap" ? `capped at ${rule.cap} ${meta.symbol}` : rule.action === "cancel" ? "cancelled" : "kept"}
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 font-mono text-xs text-zinc-500">{short(r.to)}</p>
-        </div>
-        <div className="text-right">
-          <div className="font-mono text-lg">
-            {fromRaw(r.avgRaw, meta.decimals)} <span className="text-sm text-zinc-400">{meta.symbol}</span>
-          </div>
-          <div className="text-xs text-zinc-500">avg per payment</div>
-        </div>
-      </div>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="truncate font-semibold">{who?.label ?? short(r.to)}</span>
+            {rule && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${RULE[rule.action].cls}`}>{RULE[rule.action].text}</span>}
+          </span>
+          <span className="block text-sm text-zinc-400">
+            {r.count} payments · {freq(r.intervalDays)}
+          </span>
+        </span>
+        <span className="text-right">
+          <span className="block font-mono font-semibold">{fromRaw(r.avgRaw, meta.decimals)}</span>
+          <span className="block text-xs text-zinc-500">{meta.symbol} each</span>
+        </span>
+      </button>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="rounded-xl bg-black/30 p-2">
-          <div className="text-zinc-500">Payments</div>
-          <div className="mt-0.5 font-mono text-sm">{r.count}×</div>
+      {open && (
+        <div className="border-t border-white/[0.06] p-4">
+          <p className="text-sm text-zinc-400">
+            Total {fromRaw(r.totalRaw, meta.decimals, 2)} {meta.symbol} · last paid {ago(r.lastMs)}
+            {r.nextExpectedMs && r.nextExpectedMs > Date.now() ? ` · next ${inTime(r.nextExpectedMs)}` : ""}
+          </p>
+          {capMode ? (
+            <div className="mt-4 space-y-2">
+              <input value={cap} onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && setCap(e.target.value)} inputMode="decimal" autoFocus placeholder={`Max ${meta.symbol} per payment`} className="input" />
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setCapMode(false)} className="rounded-2xl bg-white/[0.06] py-3.5 font-semibold">
+                  Back
+                </button>
+                <button onClick={() => save("cap")} disabled={!!busy} className="btn-primary">
+                  {busy ? "Saving…" : "Set limit"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button onClick={() => save("keep")} disabled={!!busy} className="rounded-2xl bg-emerald-500/15 py-3.5 font-semibold text-emerald-200 active:scale-[.98]">
+                {busy === "keep" ? "…" : "Keep"}
+              </button>
+              <button onClick={() => setCapMode(true)} disabled={!!busy} className="rounded-2xl bg-amber-500/15 py-3.5 font-semibold text-amber-200 active:scale-[.98]">
+                Limit
+              </button>
+              <button onClick={() => save("cancel")} disabled={!!busy} className="rounded-2xl bg-rose-500/15 py-3.5 font-semibold text-rose-200 active:scale-[.98]">
+                {busy === "cancel" ? "…" : "Stop"}
+              </button>
+            </div>
+          )}
+          {err && <p className="mt-2 text-sm text-rose-300">{err}</p>}
+          {rule && (
+            <p className="mt-3 text-xs text-zinc-500">
+              {RULE[rule.action].text}
+              {rule.action === "cap" ? ` at ${rule.cap} ${meta.symbol}` : ""} on {rule.at.slice(0, 10)} ·{" "}
+              <a href={walruscan(rule.blobId)} target="_blank" rel="noreferrer" className="text-violet-300">
+                saved on Walrus
+              </a>
+            </p>
+          )}
         </div>
-        <div className="rounded-xl bg-black/30 p-2">
-          <div className="text-zinc-500">Frequency</div>
-          <div className="mt-0.5 text-sm">{every(r.intervalDays).replace("every ", "") || "–"}</div>
-        </div>
-        <div className="rounded-xl bg-black/30 p-2">
-          <div className="text-zinc-500">Total sent</div>
-          <div className="mt-0.5 font-mono text-sm">{fromRaw(r.totalRaw, meta.decimals, 2)}</div>
-        </div>
-      </div>
-      <p className="mt-2 text-xs text-zinc-500">
-        Last paid {ago(r.lastMs)}
-        {r.nextExpectedMs && r.nextExpectedMs > Date.now() ? ` · next expected in ${every((r.nextExpectedMs - Date.now()) / 86_400_000).replace("every ~", "")}` : ""}
-      </p>
-
-      {mode === "cap" ? (
-        <div className="mt-4 flex items-center gap-2">
-          <input
-            value={cap}
-            onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && setCap(e.target.value)}
-            inputMode="decimal"
-            autoFocus
-            placeholder={`Max ${meta.symbol} per payment`}
-            className="input min-w-0 flex-1"
-          />
-          <button onClick={() => save("cap")} disabled={!!busy} className="btn-primary px-4 py-2.5">
-            {busy ? "Saving…" : "Save cap"}
-          </button>
-          <button onClick={() => setMode(null)} className="text-xs text-zinc-400">
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <button onClick={() => save("keep")} disabled={!!busy} className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-200 hover:bg-emerald-500/20">
-            {busy === "keep" ? "Saving…" : "Keep"}
-          </button>
-          <button onClick={() => setMode("cap")} disabled={!!busy} className="rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-sm font-medium text-amber-200 hover:bg-amber-500/20">
-            Cap
-          </button>
-          <button onClick={() => save("cancel")} disabled={!!busy} className="rounded-xl border border-rose-500/30 bg-rose-500/10 py-2.5 text-sm font-medium text-rose-200 hover:bg-rose-500/20">
-            {busy === "cancel" ? "Saving…" : "Cancel"}
-          </button>
-        </div>
-      )}
-      {err && <p className="mt-2 text-xs text-rose-300">{err}</p>}
-      {rule && (
-        <p className="mt-2 text-xs text-zinc-500">
-          Saved to Walrus on {rule.at.slice(0, 10)} ·{" "}
-          <a href={walruscan(rule.blobId)} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
-            view blob
-          </a>
-        </p>
       )}
     </div>
   );

@@ -8,81 +8,45 @@ import Recurring from "./recurring";
 import Send from "./send";
 
 const TABS = [
-  { id: "radar", label: "Watchdog", icon: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5M12 7v5l3 2" },
-  { id: "send", label: "Guarded send", icon: "M5 19 19 5M9 5h10v10" },
+  { id: "watch", label: "Watchdog", icon: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5M12 7v5l3 2" },
+  { id: "send", label: "Send", icon: "M5 19 19 5M9 5h10v10" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-function TabIcon({ d }: { d: string }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-  );
-}
-
-const STEPS = [
-  ["1", "Watches", "Reads your outgoing payments on Sui Mainnet through Tatum and finds recurring expenses."],
-  ["2", "Learns", "You mark each one keep, cancel or cap. The rules go into Walrus Memory, portable memory you own."],
-  ["3", "Remembers", "Next session, on any device, it reports what changed since last time, flags broken rules, and guards every send."],
-];
-
 export default function App() {
-  const [tab, setTab] = useState<TabId>(() => (window.location.hash.slice(1) === "send" ? "send" : "radar"));
-  const go = (t: TabId) => (setTab(t), history.replaceState(null, "", `#${t}`));
+  const [tab, setTab] = useState<TabId>(() => (window.location.hash.slice(1) === "send" ? "send" : "watch"));
+  const go = (t: TabId) => (setTab(t), history.replaceState(null, "", `#${t}`), window.scrollTo({ top: 0 }));
   return (
     <DAppKitProvider dAppKit={dAppKit}>
-      <div className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:py-12">
-        <header className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="hidden font-mono text-xs uppercase tracking-[0.2em] text-sky-400 sm:block">Tatum × Walrus Memory · Sui Mainnet</p>
-              <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:mt-2 sm:gap-3 sm:text-5xl">
-                {/* eslint-disable-next-line @next/next/no-img-element -- static svg logo */}
-                <img src="/logo.svg" alt="" className="h-8 w-8 sm:h-12 sm:w-12" />
-                <span className="truncate">Drip Radar</span>
-              </h1>
-            </div>
-            <div className="shrink-0">
-              <ConnectButton />
-            </div>
+      <div className="mx-auto w-full max-w-md px-4 pb-32 pt-4 sm:pt-8">
+        <header className="sticky top-0 z-30 -mx-4 mb-5 flex items-center justify-between bg-[#0b0e17]/80 px-4 py-3 backdrop-blur-lg">
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static svg logo */}
+            <img src="/logo.svg" alt="" className="h-8 w-8" />
+            <span className="text-lg font-bold tracking-tight">Drip Radar</span>
           </div>
-          <p className="mt-3 max-w-2xl text-sm text-zinc-400 sm:text-base">
-            An expense watchdog agent for your Sui wallet, with long-term memory. It finds the payments quietly dripping out of your wallet,
-            learns your keep / cancel / cap rules, and remembers every check in <span className="text-violet-300">Walrus Memory</span>, so it picks
-            up where it left off and tells you what changed. Chain data and simulation via <span className="text-zinc-200">Tatum</span>.
-          </p>
-          <ol className="mt-5 grid gap-3 sm:grid-cols-3">
-            {STEPS.map(([n, t, d]) => (
-              <li key={n} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm">
-                <span className="mr-2 inline-grid h-6 w-6 place-items-center rounded-full bg-sky-500/15 font-mono text-xs text-sky-300">{n}</span>
-                <span className="font-medium">{t}</span>
-                <p className="mt-1.5 text-zinc-400">{d}</p>
-              </li>
-            ))}
-          </ol>
+          <ConnectButton />
         </header>
 
-        <nav className="mb-6 hidden rounded-xl border border-white/10 bg-white/[0.03] p-1 sm:inline-flex">
+        {tab === "watch" ? <Recurring /> : <Send initialTo="" />}
+
+        <p className="mt-10 text-center text-xs text-zinc-500">
+          Memory on <span className="text-violet-300">Walrus</span> · Chain data by <span className="text-zinc-300">Tatum</span> · Sui Mainnet
+        </p>
+      </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0e17]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg">
+        <div className="mx-auto grid max-w-md grid-cols-2">
           {TABS.map((t) => (
-            <button key={t.id} onClick={() => go(t.id)} className={`rounded-lg px-4 py-2 text-sm transition ${tab === t.id ? "bg-sky-400 text-black" : "text-zinc-300 hover:text-white"}`}>
+            <button key={t.id} onClick={() => go(t.id)} className={`flex flex-col items-center gap-1 py-3 text-xs font-semibold ${tab === t.id ? "text-sky-300" : "text-zinc-500"}`}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d={t.icon} />
+              </svg>
               {t.label}
             </button>
           ))}
-        </nav>
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0a0c10]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg sm:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-2">
-            {TABS.map((t) => (
-              <button key={t.id} onClick={() => go(t.id)} className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${tab === t.id ? "text-sky-400" : "text-zinc-400"}`}>
-                <TabIcon d={t.icon} />
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {tab === "radar" ? <Recurring /> : <Send initialTo="" />}
-      </div>
+        </div>
+      </nav>
     </DAppKitProvider>
   );
 }
