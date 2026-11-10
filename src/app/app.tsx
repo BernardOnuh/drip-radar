@@ -8,7 +8,7 @@ import Recurring from "./recurring";
 import Send from "./send";
 
 const TABS = [
-  { id: "radar", label: "Radar", icon: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5M12 7v5l3 2" },
+  { id: "radar", label: "Watchdog", icon: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5M12 7v5l3 2" },
   { id: "send", label: "Guarded send", icon: "M5 19 19 5M9 5h10v10" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -22,9 +22,9 @@ function TabIcon({ d }: { d: string }) {
 }
 
 const STEPS = [
-  ["1", "Scan", "Tatum reads your sent transactions on Sui Mainnet and finds payments you keep making to the same address."],
-  ["2", "Decide", "Keep, cancel or cap each one. Your rule is written to Walrus Memory, memory you own."],
-  ["3", "Enforced", "Every future send checks your rules: a cancelled payee is stopped, a payment over your cap is flagged, then Tatum simulates it before you sign."],
+  ["1", "Watches", "Reads your outgoing payments on Sui Mainnet through Tatum and finds recurring expenses."],
+  ["2", "Learns", "You mark each one keep, cancel or cap. The rules go into Walrus Memory, portable memory you own."],
+  ["3", "Remembers", "Next session, on any device, it reports what changed since last time, flags broken rules, and guards every send."],
 ];
 
 export default function App() {
@@ -48,9 +48,9 @@ export default function App() {
             </div>
           </div>
           <p className="mt-3 max-w-2xl text-sm text-zinc-400 sm:text-base">
-            Find the payments quietly dripping out of your wallet. Subscriptions, auto-payouts, payments to people you forgot about. Keep, cancel or cap
-            each one; your rules live in <span className="text-violet-300">Walrus Memory</span> and every send is checked against them and simulated through{" "}
-            <span className="text-zinc-200">Tatum</span>.
+            An expense watchdog agent for your Sui wallet, with long-term memory. It finds the payments quietly dripping out of your wallet,
+            learns your keep / cancel / cap rules, and remembers every check in <span className="text-violet-300">Walrus Memory</span>, so it picks
+            up where it left off and tells you what changed. Chain data and simulation via <span className="text-zinc-200">Tatum</span>.
           </p>
           <ol className="mt-5 grid gap-3 sm:grid-cols-3">
             {STEPS.map(([n, t, d]) => (

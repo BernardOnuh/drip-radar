@@ -119,6 +119,40 @@ export async function rememberSend(input: { to: string; amount: string; symbol: 
   return { blobId: res.blob_id, at };
 }
 
+const SCAN_TAG = "DRIP_RADAR_SCAN";
+
+export type ScanMemory = {
+  address: string;
+  at: string;
+  lastTxMs: number | null;
+  transfers: number;
+  recurring: number;
+  blobId: string;
+};
+
+/** The watchdog's own memory: what it saw last time, so the next session picks up from there. */
+export async function rememberScan(input: Omit<ScanMemory, "blobId" | "at">) {
+  const at = new Date().toISOString();
+  const address = input.address.toLowerCase();
+  const text =
+    `Drip Radar watchdog checked wallet ${address} on ${at.slice(0, 16).replace("T", " ")} UTC: ` +
+    `${input.transfers} recent transfers, ${input.recurring} recurring payment(s).` +
+    `\n${SCAN_TAG} ${JSON.stringify({ ...input, address, at })}`;
+  const res = await memwal().rememberAndWait(text, NAMESPACE);
+  return { blobId: res.blob_id, at };
+}
+
+export async function recallLastScan(address: string) {
+  const a = address.toLowerCase();
+  const res = await memwal().recall({ query: `Drip Radar watchdog checked wallet ${a}`, limit: 30, namespace: NAMESPACE });
+  return (
+    res.results
+      .map((r) => parseTail<Omit<ScanMemory, "blobId">>(r.text, SCAN_TAG, r.blob_id))
+      .filter((v): v is ScanMemory => v !== null && v.address === a)
+      .sort((x, y) => y.at.localeCompare(x.at))[0] ?? null
+  );
+}
+
 function parseTail<T>(text: string, tag: string, blobId: string): (T & { blobId: string }) | null {
   const i = text.indexOf(tag + " ");
   if (i === -1) return null;

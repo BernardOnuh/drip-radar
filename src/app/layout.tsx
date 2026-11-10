@@ -16,7 +16,7 @@ export const viewport: Viewport = { themeColor: "#07080b", width: "device-width"
 
 export const metadata: Metadata = {
   title: "Drip Radar",
-  description: "Find the payments quietly dripping out of your Sui wallet. Keep, cancel or cap them, with rules kept in Walrus Memory and enforced on every send.",
+  description: "An expense watchdog agent for your Sui wallet with long-term memory in Walrus. Finds recurring payments, learns your rules, and picks up where it left off.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

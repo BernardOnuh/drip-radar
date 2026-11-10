@@ -30,11 +30,75 @@ type Scan = {
   rules: Rule[];
   labels: Record<string, { label: string | null; verdict: "trust" | "block" }>;
   memoryError: string | null;
+  report: {
+    lastScan: { at: string; recurring: number; transfers: number; blobId: string } | null;
+    freshCount: number;
+    spend: { coinType: string; symbol: string; amount: string }[];
+    newRecipients: string[];
+    alerts: { level: "critical" | "high" | "info"; text: string; digest?: string; atMs?: number }[];
+  };
 };
+
+const ALERT = { critical: "border-rose-500/40 bg-rose-500/10 text-rose-200", high: "border-amber-500/40 bg-amber-500/10 text-amber-200", info: "border-sky-500/30 bg-sky-500/10 text-sky-200" };
+
+function Report({ scan }: { scan: Scan }) {
+  const r = scan.report;
+  const last = r.lastScan;
+  return (
+    <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-b from-sky-500/[0.07] to-transparent p-4 sm:p-5">
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" />
+        </span>
+        <p className="text-xs font-semibold uppercase tracking-wider text-sky-300">Watchdog report</p>
+      </div>
+      <p className="mt-2 text-lg font-medium">
+        {last ? (
+          <>
+            Welcome back. I last checked this wallet {ago(Date.parse(last.at))}
+            {r.freshCount ? `, and ${r.freshCount} new transfer${r.freshCount === 1 ? "" : "s"} went out since then.` : ". Nothing new has gone out since then."}
+          </>
+        ) : (
+          <>First check of this wallet. I&apos;ll remember what I saw, so next time I can tell you what changed.</>
+        )}
+      </p>
+      {r.spend.length > 0 && (
+        <p className="mt-1 text-sm text-zinc-400">
+          Spent since last check: <span className="text-zinc-200">{r.spend.map((x) => `${x.amount} ${x.symbol}`).join(" · ")}</span>
+          {r.newRecipients.length > 0 && <> · new recipients: <span className="text-zinc-200">{r.newRecipients.join(", ")}</span></>}
+        </p>
+      )}
+      <div className="mt-3 space-y-2">
+        {r.alerts.map((a, i) => (
+          <div key={i} className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${ALERT[a.level]}`}>
+            <span>{a.level === "info" ? "ℹ" : "⚠"}</span>
+            <span className="flex-1">{a.text}</span>
+            {a.atMs && <span className="shrink-0 text-xs opacity-70">{ago(a.atMs)}</span>}
+          </div>
+        ))}
+        {r.alerts.length === 0 && <p className="text-sm text-emerald-300">✓ No rule was broken. Every payment respected your keep / cancel / cap rules.</p>}
+      </div>
+      <p className="mt-3 text-xs text-zinc-500">
+        Memory: {scan.rules.length} rule{scan.rules.length === 1 ? "" : "s"} recalled from <span className="text-violet-300">Walrus</span>
+        {last && (
+          <>
+            {" "}· last check{" "}
+            <a href={walruscan(last.blobId)} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
+              stored on Walrus
+            </a>
+          </>
+        )}{" "}
+        · this check is being saved now.
+      </p>
+    </div>
+  );
+}
 
 const ago = (ms: number) => {
   const d = (Date.now() - ms) / 86_400_000;
-  return d < 1 ? `${Math.max(1, Math.round(d * 24))}h ago` : `${Math.round(d)}d ago`;
+  if (d < 1 / 24) return `${Math.max(1, Math.round(d * 1440))} min ago`;
+  return d < 1 ? `${Math.round(d * 24)}h ago` : `${Math.round(d)}d ago`;
 };
 const every = (d: number | null) => (d == null ? "" : d < 1 ? `every ~${Math.max(1, Math.round(d * 24))}h` : `every ~${Math.round(d)} day${Math.round(d) === 1 ? "" : "s"}`);
 
@@ -76,11 +140,11 @@ export default function Recurring() {
   return (
     <div className="space-y-4">
       <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-        <h2 className="text-lg font-semibold">Scan a wallet</h2>
+        <h2 className="text-lg font-semibold">Which wallet should I watch?</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Finds payments you keep sending to the same address (subscriptions, rent, salaries, auto-payouts) from your Sui history via{" "}
-          <span className="text-zinc-200">Tatum</span>. Mark each one keep, cancel or cap. Your decision is saved to{" "}
-          <span className="text-violet-300">Walrus Memory</span> and enforced on every future send.
+          I read your outgoing payments on Sui via{" "}
+          <span className="text-zinc-200">Tatum</span>, spot recurring expenses, and remember every check and every rule you give me in{" "}
+          <span className="text-violet-300">Walrus Memory</span>, so I pick up where we left off on any device.
         </p>
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/5 bg-black/30 p-3">
           {valid ? <AddressAvatar address={address} /> : <span className="h-9 w-9 shrink-0 rounded-full border border-dashed border-white/15" />}
@@ -105,6 +169,7 @@ export default function Recurring() {
 
       {scan && !loading && (
         <>
+          <Report scan={scan} />
           <p className="px-1 text-xs uppercase tracking-wider text-zinc-500">
             Scanned your last {scan.scanned} signed transactions ({scan.sentCount} transfers) · {scan.recurring.length} recurring payment{scan.recurring.length === 1 ? "" : "s"}
           </p>
